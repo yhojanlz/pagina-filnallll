@@ -291,7 +291,6 @@ app.get("/api/store", async (req, res) => {
       whatsapp,
       tasaDolar
     });
-    });
   } catch (err) {
     console.error("Error en /api/store:", err);
     res.status(500).json({ error: "Error interno del servidor" });

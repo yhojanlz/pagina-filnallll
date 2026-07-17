@@ -223,7 +223,173 @@ async function initPostgresDatabase() {
 }
 
 
+// Endpoints de la API para el Frontend
+app.get("/api/store", async (req, res) => {
+  try {
+    const products = await runQuery("SELECT * FROM products");
+    const categories = await runQuery("SELECT * FROM categories");
+    const paymentMethodsRaw = await runQuery("SELECT * FROM payment_methods");
+    const paymentFields = await runQuery("SELECT * FROM payment_fields");
+    const settingsRaw = await runQuery("SELECT * FROM settings");
+
+    // Formatear métodos de pago con sus campos correspondientes
+    const paymentMethods = paymentMethodsRaw.map(method => {
+      return {
+        id: method.id,
+        label: method.label,
+        instructions: method.instructions,
+        enabled: method.enabled === 1 || method.enabled === true,
+        fields: paymentFields
+          .filter(f => f.methodid === method.id || f.methodId === method.id)
+          .map(f => ({ key: f.key, label: f.label, value: f.value }))
+      };
+    });
+
+    const whatsappSetting = settingsRaw.find(s => s.key === "whatsapp");
+    const whatsapp = whatsappSetting ? whatsappSetting.value : "584120000000";
+
+    // Parsear las tallas de los productos (vienen como JSON string)
+    const formattedProducts = products.map(p => {
+      let sizes = [];
+      try {
+        sizes = typeof p.sizes === "string" ? JSON.parse(p.sizes) : p.sizes;
+      } catch (e) {
+        sizes = [];
+      }
+      return { ...p, sizes };
+    });
+
+    res.json({
+      products: formattedProducts,
+      categories,
+      paymentMethods,
+      whatsapp
+    });
+  } catch (err) {
+    console.error("Error en /api/store:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+app.get("/api/cart", async (req, res) => {
+  const { sessionId } = req.query;
+  try {
+    const items = await runQuery("SELECT * FROM cart_items WHERE sessionId = ?", [sessionId]);
+    res.json({ items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/cart", async (req, res) => {
+  const { sessionId, items } = req.body;
+  try {
+    // Limpiar carrito anterior de la sesión
+    await runCommand("DELETE FROM cart_items WHERE sessionId = ?", [sessionId]);
+    // Insertar nuevos items
+    for (const item of items) {
+      await runCommand(
+        "INSERT INTO cart_items (sessionId, productId, size, quantity) VALUES (?, ?, ?, ?)",
+        [sessionId, item.productId, item.size, item.quantity]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/orders", async (req, res) => {
+  const { sessionId, total, paymentMethod, items } = req.body;
+  try {
+    const result = await runCommand(
+      "INSERT INTO orders (sessionId, total, paymentMethod, items) VALUES (?, ?, ?, ?)",
+      [sessionId, total, paymentMethod, JSON.stringify(items)]
+    );
+    res.json({ success: true, orderId: result.lastID });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/products", upload.single("image"), async (req, res) => {
+  const { id, name, price, categoryId, description, sizes } = req.body;
+  const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
+  try {
+    await runCommand(
+      "INSERT INTO products (id, name, price, categoryId, image, description, sizes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [id, name, parseFloat(price), categoryId, image, description, sizes]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/products/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await runCommand("DELETE FROM products WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/admin/categories", async (req, res) => {
+  const { id, name, department } = req.body;
+  try {
+    await runCommand("INSERT INTO categories (id, name, department) VALUES (?, ?, ?)", [id, name, department]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/admin/categories/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await runCommand("DELETE FROM categories WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/payments/:id", async (req, res) => {
+  const { id } = req.params;
+  const { enabled } = req.body;
+  try {
+    await runCommand("UPDATE payment_methods SET enabled = ? WHERE id = ?", [enabled ? 1 : 0, id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/payments/:id/fields", async (req, res) => {
+  const { id } = req.params;
+  const { key, value } = req.body;
+  try {
+    await runCommand("UPDATE payment_fields SET value = ? WHERE methodId = ? AND key = ?", [value, id, key]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/settings/whatsapp", async (req, res) => {
+  const { value } = req.body;
+  try {
+    await runCommand("UPDATE settings SET value = ? WHERE key = 'whatsapp'", [value]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Iniciar el servidor Express
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+

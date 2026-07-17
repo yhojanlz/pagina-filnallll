@@ -225,6 +225,13 @@ async function initPostgresDatabase() {
     const setCount = await pgPool.query("SELECT COUNT(*) FROM settings");
     if (parseInt(setCount.rows[0].count) === 0) {
       await pgPool.query("INSERT INTO settings (key, value) VALUES ('whatsapp', '584120000000')");
+      await pgPool.query("INSERT INTO settings (key, value) VALUES ('tasa_dolar', '60.0')");
+    } else {
+      // Asegurar que exista la tasa del dólar
+      const tasaCheck = await pgPool.query("SELECT COUNT(*) FROM settings WHERE key = 'tasa_dolar'");
+      if (parseInt(tasaCheck.rows[0].count) === 0) {
+        await pgPool.query("INSERT INTO settings (key, value) VALUES ('tasa_dolar', '60.0')");
+      }
     }
 
     console.log("Base de datos PostgreSQL inicializada correctamente.");
@@ -259,6 +266,9 @@ app.get("/api/store", async (req, res) => {
     const whatsappSetting = settingsRaw.find(s => s.key === "whatsapp");
     const whatsapp = whatsappSetting ? whatsappSetting.value : "584120000000";
 
+    const tasaSetting = settingsRaw.find(s => s.key === "tasa_dolar");
+    const tasaDolar = tasaSetting ? parseFloat(tasaSetting.value) : 60.0;
+
     // Parsear las tallas de los productos (vienen como JSON string) y normalizar categoryId
     const formattedProducts = products.map(p => {
       let sizes = [];
@@ -278,7 +288,9 @@ app.get("/api/store", async (req, res) => {
       products: formattedProducts,
       categories,
       paymentMethods,
-      whatsapp
+      whatsapp,
+      tasaDolar
+    });
     });
   } catch (err) {
     console.error("Error en /api/store:", err);
@@ -480,10 +492,22 @@ app.put("/api/admin/settings/whatsapp", async (req, res) => {
   }
 });
 
+app.put("/api/admin/settings/tasa", async (req, res) => {
+  const { value } = req.body;
+  try {
+    await runCommand("UPDATE settings SET value = ? WHERE key = 'tasa_dolar'", [value]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Iniciar el servidor Express
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
+
 
 
 

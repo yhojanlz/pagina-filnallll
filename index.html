@@ -133,6 +133,7 @@
       const [cart, setCart] = useState([]);
       const [paymentMethods, setPaymentMethods] = useState([]);
       const [whatsapp, setWhatsapp] = useState('584120000000');
+      const [tasaDolar, setTasaDolar] = useState(60.0);
       const [department, setDepartment] = useState('mujer');
       const [selectedCategory, setSelectedCategory] = useState(null);
       const [cartOpen, setCartOpen] = useState(false);
@@ -154,6 +155,7 @@
           setCategories(data.categories);
           setPaymentMethods(data.paymentMethods);
           setWhatsapp(data.whatsapp);
+          setTasaDolar(data.tasaDolar || 60.0);
 
           const cartRes = await fetch(`/api/cart?sessionId=${sessionId}`);
           const cartData = await cartRes.json();
@@ -496,6 +498,7 @@
               cartTotal={cartTotal} 
               paymentMethods={paymentMethods} 
               whatsapp={whatsapp}
+              tasaDolar={tasaDolar}
               onClose={() => setCheckoutOpen(false)}
               clearCart={clearCart}
             />
@@ -510,6 +513,7 @@
               categories={categories} 
               paymentMethods={paymentMethods} 
               whatsapp={whatsapp}
+              tasaDolar={tasaDolar}
               onClose={() => setAdminOpen(false)}
               refreshData={loadStoreData}
             />
@@ -519,7 +523,7 @@
     }
 
     // Componente Diálogo de Checkout
-    function CheckoutDialog({ cart, products, cartTotal, paymentMethods, whatsapp, onClose, clearCart }) {
+    function CheckoutDialog({ cart, products, cartTotal, paymentMethods, whatsapp, tasaDolar, onClose, clearCart }) {
       const [selectedMethod, setSelectedMethod] = useState('');
       const [isSending, setIsSending] = useState(false);
 
@@ -552,14 +556,23 @@
 
           const method = paymentMethods.find(m => m.id === selectedMethod);
 
+          // Calcular total en Bs si es Pago Móvil
+          const totalBs = (cartTotal * tasaDolar).toFixed(2);
+
           // Construir mensaje de WhatsApp limpio, justificado a la izquierda y sin símbolos raros
           let message = `NUEVO PEDIDO - ATHENEA STORE\n\n`;
           message += `DETALLE DE LA COMPRA:\n`;
           orderItems.forEach(item => {
             message += `- ${item.name} (Talla: ${item.size}) x${item.quantity} - $${item.price * item.quantity}\n`;
           });
-          message += `\nMONTO TOTAL: $${cartTotal}\n\n`;
-          message += `Hola, acabo de realizar este pedido desde la web. Por favor, confírmame para procesar mi pedido.`;
+          message += `\nMONTO TOTAL: $${cartTotal}\n`;
+          if (selectedMethod === 'pago_movil') {
+            message += `MONTO EN BOLÍVARES (Tasa: ${tasaDolar} Bs): ${totalBs} Bs\n`;
+            message += `MÉTODO DE PAGO: Pago Móvil\n`;
+          } else {
+            message += `MÉTODO DE PAGO: ${method ? method.label : selectedMethod}\n`;
+          }
+          message += `\nHola, acabo de realizar este pedido desde la web. Por favor, confírmame para procesar mi pedido.`;
 
           const waUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`;
           window.open(waUrl, '_blank');
@@ -608,6 +621,15 @@
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {paymentMethods.find(m => m.id === selectedMethod)?.instructions}
                   </p>
+                  
+                  {selectedMethod === 'pago_movil' && (
+                    <div className="bg-primary/5 border border-primary/10 p-3 rounded-md text-xs space-y-1">
+                      <p className="font-semibold text-foreground">Monto a pagar en Bolívares:</p>
+                      <p className="text-lg font-bold text-primary">{(cartTotal * tasaDolar).toFixed(2)} Bs</p>
+                      <p className="text-[10px] text-muted-foreground">Tasa de cambio: 1 USD = {tasaDolar} Bs</p>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5 border-t border-border pt-2">
                     {paymentMethods.find(m => m.id === selectedMethod)?.fields.map(f => (
                       <div key={f.key} className="text-xs flex items-center justify-between gap-2 py-1">
@@ -645,7 +667,7 @@
     }
 
     // Componente Panel de Administración
-    function AdminPanel({ isAdmin, setIsAdmin, products, categories, paymentMethods, whatsapp, onClose, refreshData }) {
+    function AdminPanel({ isAdmin, setIsAdmin, products, categories, paymentMethods, whatsapp, tasaDolar, onClose, refreshData }) {
       const [username, setUsername] = useState('');
       const [password, setPassword] = useState('');
       const [activeTab, setActiveTab] = useState('products');
@@ -667,6 +689,7 @@
 
       // WhatsApp
       const [waNum, setWaNum] = useState(whatsapp);
+      const [tasaVal, setTasaVal] = useState(tasaDolar);
 
       // Efecto para inicializar la categoría por defecto cuando carguen las categorías
       useEffect(() => {
@@ -824,13 +847,28 @@
       const handleUpdateWhatsapp = async (e) => {
         e.preventDefault();
         try {
-          await fetch('/api/settings/whatsapp', {
-            method: 'PATCH',
+          await fetch('/api/admin/settings/whatsapp', {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: waNum })
           });
           refreshData();
           alert('WhatsApp actualizado');
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const handleUpdateTasa = async (e) => {
+        e.preventDefault();
+        try {
+          await fetch('/api/admin/settings/tasa', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: tasaVal })
+          });
+          refreshData();
+          alert('Tasa del dólar actualizada');
         } catch (err) {
           console.error(err);
         }
@@ -1182,6 +1220,20 @@
                     className="w-full p-2 border border-border rounded bg-background text-sm" 
                   />
                   <button type="submit" className="w-full bg-foreground text-background py-2 text-xs uppercase tracking-widest font-medium">Actualizar WhatsApp</button>
+                </form>
+
+                <form onSubmit={handleUpdateTasa} className="space-y-4 border border-border p-4 rounded-lg">
+                  <h4 className="text-sm font-semibold uppercase tracking-wider">Tasa del Dólar (BCV / Paralelo)</h4>
+                  <p className="text-xs text-muted-foreground">Tasa de cambio para calcular los pagos en Bolívares (Bs):</p>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={tasaVal} 
+                    onChange={e => setTasaVal(e.target.value)} 
+                    required 
+                    className="w-full p-2 border border-border rounded bg-background text-sm" 
+                  />
+                  <button type="submit" className="w-full bg-foreground text-background py-2 text-xs uppercase tracking-widest font-medium">Actualizar Tasa</button>
                 </form>
               </div>
             )}

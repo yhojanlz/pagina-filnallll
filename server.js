@@ -214,3 +214,9 @@ async function initPostgresDatabase() {
     console.error("Error inicializando PostgreSQL:", err);
   }
 }
+
+
+// Iniciar el servidor Express
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
+});

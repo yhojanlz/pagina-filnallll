@@ -312,6 +312,52 @@ app.post("/api/orders", async (req, res) => {
   }
 });
 
+app.post("/api/upload", upload.single("image"), (req, res) => {
+  if (req.file) {
+    res.json({ imageUrl: `/uploads/${req.file.filename}` });
+  } else {
+    res.status(400).json({ error: "No se subió ningún archivo" });
+  }
+});
+
+app.post("/api/products", async (req, res) => {
+  const { name, price, categoryId, image, description, sizes } = req.body;
+  const id = "p-" + Date.now();
+  try {
+    await runCommand(
+      "INSERT INTO products (id, name, price, categoryId, image, description, sizes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [id, name, parseFloat(price), categoryId, image, description, JSON.stringify(sizes)]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch("/api/products/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, price, categoryId, image, description, sizes } = req.body;
+  try {
+    await runCommand(
+      "UPDATE products SET name = ?, price = ?, categoryId = ?, image = ?, description = ?, sizes = ? WHERE id = ?",
+      [name, parseFloat(price), categoryId, image, description, JSON.stringify(sizes), id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/products/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await runCommand("DELETE FROM products WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/admin/products", upload.single("image"), async (req, res) => {
   const { id, name, price, categoryId, description, sizes } = req.body;
   const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
@@ -392,4 +438,5 @@ app.put("/api/admin/settings/whatsapp", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
 

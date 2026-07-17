@@ -43,6 +43,10 @@ if (isProduction) {
       rejectUnauthorized: false
     }
   });
+  // Escuchar errores en el pool para evitar que la app se caiga
+  pgPool.on('error', (err) => {
+    console.error('Error inesperado en el cliente de PostgreSQL:', err);
+  });
   initPostgresDatabase();
 } else {
   console.log("Iniciando en modo DESARROLLO con SQLite local...");
@@ -166,7 +170,7 @@ async function initPostgresDatabase() {
     // Insertar datos iniciales si está vacío
     const catCount = await pgPool.query("SELECT COUNT(*) FROM categories");
     if (parseInt(catCount.rows[0].count) === 0) {
-      await pgPool.query(`INSERT INTO categories (id, name, department) VALUES 
+      await pgPool.query(`INSERT INTO categories (id, name, department) VALUES
         ('c1', 'Vestidos', 'mujer'),
         ('c2', 'Deportivo', 'mujer'),
         ('c3', 'Camisas', 'hombre'),
@@ -176,7 +180,7 @@ async function initPostgresDatabase() {
 
     const prodCount = await pgPool.query("SELECT COUNT(*) FROM products");
     if (parseInt(prodCount.rows[0].count) === 0) {
-      await pgPool.query(`INSERT INTO products (id, name, price, categoryId, image, description, sizes) VALUES 
+      await pgPool.query(`INSERT INTO products (id, name, price, categoryId, image, description, sizes) VALUES
         ('p1', 'Vestido de Gala Atenas', 89.99, 'c1', 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600', 'Vestido largo de seda con caída elegante, ideal para eventos formales.', '["S", "M", "L"]'),
         ('p2', 'Conjunto Deportivo Aura', 45.0, 'c2', 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?w=600', 'Top y legging de alta compresión, transpirable y cómodo.', '["S", "M"]'),
         ('p3', 'Camisa Lino Premium', 39.99, 'c3', 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=600', 'Camisa de lino 100% orgánico, fresca y de corte moderno.', '["M", "L", "XL"]')`);
@@ -184,12 +188,12 @@ async function initPostgresDatabase() {
 
     const payCount = await pgPool.query("SELECT COUNT(*) FROM payment_methods");
     if (parseInt(payCount.rows[0].count) === 0) {
-      await pgPool.query(`INSERT INTO payment_methods (id, label, instructions, enabled) VALUES 
+      await pgPool.query(`INSERT INTO payment_methods (id, label, instructions, enabled) VALUES
         ('pago_movil', 'Pago Móvil', 'Realiza tu pago móvil a los siguientes datos y envíanos el capture.', 1),
         ('transferencia', 'Transferencia Bancaria', 'Transfiere a nuestra cuenta corriente y adjunta el comprobante.', 1),
         ('zelle', 'Zelle', 'Envía tu pago por Zelle al correo indicado.', 1)`);
 
-      await pgPool.query(`INSERT INTO payment_fields (methodId, key, label, value) VALUES 
+      await pgPool.query(`INSERT INTO payment_fields (methodId, key, label, value) VALUES
         ('pago_movil', 'banco', 'Banco', 'Banco de Venezuela'),
         ('pago_movil', 'telefono', 'Teléfono', '04120000000'),
         ('pago_movil', 'cedula', 'Cédula', 'V-12345678'),

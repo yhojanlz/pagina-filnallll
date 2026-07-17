@@ -174,6 +174,18 @@ async function initPostgresDatabase() {
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Forzar actualización de Transferencia Bancaria a Binance Pay en PostgreSQL
+    await pgPool.query(`UPDATE payment_methods SET label = 'Binance Pay', instructions = 'Realiza tu pago a través de Binance Pay (Pay ID o correo) y envíanos el capture.' WHERE id = 'transferencia'`);
+    
+    // Verificar si ya existen los campos de Binance Pay, si no, crearlos
+    const fieldCheck = await pgPool.query("SELECT COUNT(*) FROM payment_fields WHERE methodId = 'transferencia' AND key = 'pay_id'");
+    if (parseInt(fieldCheck.rows[0].count) === 0) {
+      await pgPool.query("DELETE FROM payment_fields WHERE methodId = 'transferencia'");
+      await pgPool.query(`INSERT INTO payment_fields (methodId, key, label, value) VALUES
+        ('transferencia', 'pay_id', 'Binance Pay ID', '123456789'),
+        ('transferencia', 'correo', 'Correo Binance', 'pagos@atheneastore.com')`);
+    }
+
     // Insertar datos iniciales si está vacío
     const catCount = await pgPool.query("SELECT COUNT(*) FROM categories");
     if (parseInt(catCount.rows[0].count) === 0) {
@@ -197,16 +209,15 @@ async function initPostgresDatabase() {
     if (parseInt(payCount.rows[0].count) === 0) {
       await pgPool.query(`INSERT INTO payment_methods (id, label, instructions, enabled) VALUES
         ('pago_movil', 'Pago Móvil', 'Realiza tu pago móvil a los siguientes datos y envíanos el capture.', 1),
-        ('transferencia', 'Transferencia Bancaria', 'Transfiere a nuestra cuenta corriente y adjunta el comprobante.', 1),
+        ('transferencia', 'Binance Pay', 'Realiza tu pago a través de Binance Pay (Pay ID o correo) y envíanos el capture.', 1),
         ('zelle', 'Zelle', 'Envía tu pago por Zelle al correo indicado.', 1)`);
 
       await pgPool.query(`INSERT INTO payment_fields (methodId, key, label, value) VALUES
         ('pago_movil', 'banco', 'Banco', 'Banco de Venezuela'),
         ('pago_movil', 'telefono', 'Teléfono', '04120000000'),
         ('pago_movil', 'cedula', 'Cédula', 'V-12345678'),
-        ('transferencia', 'banco', 'Banco', 'Banesco'),
-        ('transferencia', 'cuenta', 'Nro. Cuenta', '0134-0000-00-0000000000'),
-        ('transferencia', 'rif', 'RIF', 'J-12345678-9'),
+        ('transferencia', 'pay_id', 'Binance Pay ID', '123456789'),
+        ('transferencia', 'correo', 'Correo Binance', 'pagos@atheneastore.com'),
         ('zelle', 'correo', 'Correo Zelle', 'pagos@atheneastore.com'),
         ('zelle', 'titular', 'Titular', 'Athenea Store C.A.')`);
     }
@@ -473,6 +484,7 @@ app.put("/api/admin/settings/whatsapp", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
 
 
 

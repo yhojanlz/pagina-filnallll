@@ -838,8 +838,8 @@
 
       const handleTogglePayment = async (id, enabled) => {
         try {
-          await fetch(`/api/payment-methods/${id}`, {
-            method: 'PATCH',
+          await fetch(`/api/admin/payments/${id}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled })
           });
@@ -851,10 +851,10 @@
 
       const handleUpdatePaymentField = async (methodId, fieldKey, value) => {
         try {
-          await fetch(`/api/payment-methods/${methodId}`, {
-            method: 'PATCH',
+          await fetch(`/api/admin/payments/${methodId}/fields`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fieldKey, value })
+            body: JSON.stringify({ key: fieldKey, value })
           });
           refreshData();
         } catch (err) {

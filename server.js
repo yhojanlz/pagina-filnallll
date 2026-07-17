@@ -13,6 +13,13 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+// Servir archivos estáticos del frontend (index.html)
+app.use(express.static(path.join(__dirname)));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 // Asegurar que la carpeta uploads existe
 if (!fs.existsSync("./uploads")) {
   fs.mkdirSync("./uploads");

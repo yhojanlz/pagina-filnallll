@@ -238,9 +238,9 @@ app.get("/api/store", async (req, res) => {
         id: method.id,
         label: method.label,
         instructions: method.instructions,
-        enabled: method.enabled === 1 || method.enabled === true,
+        enabled: method.enabled === 1 || method.enabled === true || method.enabled === '1',
         fields: paymentFields
-          .filter(f => f.methodid === method.id || f.methodId === method.id)
+          .filter(f => f.methodid === method.id || f.methodId === method.id || f.methodID === method.id)
           .map(f => ({ key: f.key, label: f.label, value: f.value }))
       };
     });
@@ -248,7 +248,7 @@ app.get("/api/store", async (req, res) => {
     const whatsappSetting = settingsRaw.find(s => s.key === "whatsapp");
     const whatsapp = whatsappSetting ? whatsappSetting.value : "584120000000";
 
-    // Parsear las tallas de los productos (vienen como JSON string)
+    // Parsear las tallas de los productos (vienen como JSON string) y normalizar categoryId
     const formattedProducts = products.map(p => {
       let sizes = [];
       try {
@@ -256,7 +256,11 @@ app.get("/api/store", async (req, res) => {
       } catch (e) {
         sizes = [];
       }
-      return { ...p, sizes };
+      return { 
+        ...p, 
+        sizes,
+        categoryId: p.categoryid || p.categoryId || p.categoryId || ''
+      };
     });
 
     res.json({

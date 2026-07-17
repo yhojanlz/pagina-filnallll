@@ -358,6 +358,37 @@ app.delete("/api/products/:id", async (req, res) => {
   }
 });
 
+app.post("/api/categories", async (req, res) => {
+  const { name, department } = req.body;
+  const id = "c-" + Date.now();
+  try {
+    await runCommand("INSERT INTO categories (id, name, department) VALUES (?, ?, ?)", [id, name, department]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/categories/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await runCommand("DELETE FROM categories WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch("/api/settings/whatsapp", async (req, res) => {
+  const { value } = req.body;
+  try {
+    await runCommand("UPDATE settings SET value = ? WHERE key = 'whatsapp'", [value]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/admin/products", upload.single("image"), async (req, res) => {
   const { id, name, price, categoryId, description, sizes } = req.body;
   const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
@@ -438,5 +469,6 @@ app.put("/api/admin/settings/whatsapp", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
 
 
